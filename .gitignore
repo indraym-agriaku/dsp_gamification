@@ -1,0 +1,32 @@
+# Ignore IDE specific
+.idea/
+
+# Ignore ENV
+.env
+
+# Ignore venv
+venv_gamification_experiment/
+
+# Ignore notebooks
+notebooks/
+
+# Ignore what_this.txt
+*/what_this.txt
+*/*/what_this.txt
+
+# Ignore anyfile under credentials folder
+credentials/*
+
+# Ignore cache from Python scripts in any folder
+__pycache__
+*/__pycache__/*
+
+# Ignore cache from IPYNB in any folder
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Ignore datasets 
+datasets/
+
+# Ignore outputs 
+outputs/
