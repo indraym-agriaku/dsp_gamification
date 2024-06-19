@@ -7,9 +7,6 @@
 # Ignore venv
 venv_gamification_experiment/
 
-# Ignore notebooks
-notebooks/
-
 # Ignore what_this.txt
 */what_this.txt
 */*/what_this.txt

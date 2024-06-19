@@ -28,8 +28,8 @@ if __name__ == "__main__" :
     parser.add_argument('--env',dest='env',metavar='',type=str,required = False,help = 'Environment in which the quiz information will be stored',default='prod',choices=['prod','dev'])
     parser.add_argument('--date',dest='date',metavar='',type=str,required = True,help='Starting date of the quiz')
     parser.add_argument('--on_server',dest='on_server',action='store_true')
-    parser.add_argument('--min_prd',dest='min_prd',metavar='',type=int,required = False,help='Minimum number of products in each batch',default=7)
-    parser.add_argument('--max_prd',dest='max_prd',metavar='',type=int,required = False,help='Maximum number of products in each batch',default=28)
+    parser.add_argument('--min_prd',dest='min_prd',metavar='',type=int,required = False,help='Minimum number of products in each batch',default=12)
+    parser.add_argument('--max_prd',dest='max_prd',metavar='',type=int,required = False,help='Maximum number of products in each batch',default=42)
     args = parser.parse_args()
     dict_args = vars(args)
     print(dict_args)
@@ -46,6 +46,7 @@ if __name__ == "__main__" :
     with open(os.path.join(PATH_QUERY,'list_pareto.sql'),'r') as f:
         pareto_df  = myGBQ.gbq_read(f.read().format(pareto_date=month_pareto,cluster_name = dict_args['cluster']))
     pareto_df = pareto_df.sample(frac=1).reset_index(drop=True) #Shuffle the pareto list
+    
     print(f"> Found {pareto_df.shape[0]} pareto products in cluster {dict_args['cluster']} and pareto month : {month_pareto}")
     
     if pareto_df.empty : 
@@ -64,9 +65,13 @@ if __name__ == "__main__" :
                                                        N_prd = pareto_df.shape[0]))
         non_pareto_df = non_pareto_df.sample(frac=1).reset_index(drop=True) #Shuffle the non pareto list
         print(f"> Found {non_pareto_df.shape[0]} non-pareto products in cluster {dict_args['cluster']} with period trx ({START_TRX_PERIOD} - {END_TRX_PERIOD}) and pareto month : {month_pareto}")
-
-
-
+        
+        # Create the list for all products 
+        pareto_df['is_assortment'] = True 
+        non_pareto_df['is_assortment'] = False 
+        list_prd_df  = pd.concat([pareto_df[['prd_id','is_assortment']],non_pareto_df[['prd_id','is_assortment']]],axis = 0)
+        list_prd_df['cluster'] = dict_args['cluster'].upper()
+        list_prd_df = list_prd_df.reset_index(drop=True)
 
         ###########################################################################################################################
         # DATA PROCESSING
@@ -123,8 +128,16 @@ if __name__ == "__main__" :
         prd_group_df = pd.DataFrame({'prd_group_id':prd_group_dict.keys(),'cluster':[f"{dict_args['cluster'].upper()}"]*(len(prd_group_dict.keys()))})
         prd_group_df['list_prd_id'] = prd_group_df['prd_group_id'].apply(lambda x : json.dumps({f"prd_ids":prd_group_dict[x].tolist()}))
         pareto_snapshot = datetime.strptime(eval_date.strftime("%Y-%m-01"),"%Y-%m-%d")
+        
+        # Creating snapshot and prc_dt for prd_group_df
         prd_group_df['pareto_snapshot_dt'] = pareto_snapshot
         prd_group_df['prc_dt'] = datetime.now()
+        
+        # Creating snapshot and prc_dt for list_prd_df 
+        list_prd_df['pareto_snapshot_dt'] = pareto_snapshot
+        list_prd_df['prc_dt'] = datetime.now()
+        
+        
         if prd_group_df.duplicated(subset=['list_prd_id']).sum() > 0 :
             raise Exception(f"There are {prd_group_df.duplicated(subset=['list_prd_id']).sum()} groups")
         else :
@@ -138,7 +151,7 @@ if __name__ == "__main__" :
             print(prd_group,pool_prd.shape[0])
             idx_arr,bincount_idx = rb.create_random_set(
                 n_prd = pool_prd.shape[0],
-                min_appear = 3,
+                min_appear = 2,
                 set_size = 3
             )
             quiz_arr = pool_prd[idx_arr]
@@ -269,11 +282,22 @@ if __name__ == "__main__" :
             'cols' : ['unique_key','mitra_group_id','cluster','batch_sequence','prd_group_id','batch_start_date','batch_end_date','day_sequence','quiz_id','quiz_start_date','quiz_end_date','pareto_snapshot_dt','prc_dt'],
             'cols_types' :['STRING','STRING','STRING','INTEGER','STRING','DATETIME','DATETIME','INTEGER','STRING','DATETIME','DATETIME','DATETIME','DATETIME']}
             
+            # PRD LIST
+            dict_tables['PRD_LIST'] = {
+            'target_table' : 'mp_ref.mp_ref_gamification_prd_list' ,
+            'temp_table' : 'temp.gamification_prd_list',
+            'partition_key' : 'pareto_snapshot_dt',
+            'cluster_keys' : ['cluster'],
+            'cols' : ['prd_id','is_assortment','cluster','pareto_snapshot_dt','prc_dt'],
+            'cols_types' :['INTEGER','BOOLEAN','STRING','DATETIME','DATETIME']
+            }
+            
         #input dataframe into dict 
         dict_tables['PRD_GROUP']['df'] = prd_group_df
         dict_tables['PRD_GROUP_QUIZ']['df'] = prd_quiz_df
         dict_tables['MITRA_GROUP']['df'] = mitra_group_df
         dict_tables['MITRA_GROUP_QUIZ']['df'] = mitra_group_quiz_df
+        dict_tables['PRD_LIST']['df'] = list_prd_df
                 
         # For PRD GROUP 
         for table_ in dict_tables.keys():

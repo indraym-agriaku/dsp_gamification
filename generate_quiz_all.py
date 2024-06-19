@@ -20,7 +20,9 @@ from dao.google_bigquery import GoogleBigQuery as gbq
 
 PATH_QUERY  = os.path.join(os.getcwd(),'queries')
 PATH_OUTPUT_RANDOM = os.path.join(os.getcwd(),'random_prd_arr_id')
-CLUSTER_LIST = ['Bocimi','Priangan Timur 2','Bandung Raya','Kapursub','Ciayumajakuning','Priangan Timur 1']
+# CLUSTER_LIST = ['Bocimi','Priangan Timur 2','Bandung Raya','Kapursub','Ciayumajakuning','Priangan Timur 1']
+CLUSTER_LIST = ['Bocimi','Priangan Timur','Bandung Raya','Kapursub','Ciayumajakuning']
+
 
 if __name__ == "__main__" :
     
